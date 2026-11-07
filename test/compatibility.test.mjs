@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import fs from 'node:fs';
+import path from 'node:path';
+import {install} from '../adapter/install.mjs';
+const fixture=process.env.ST_LIBRARY_COMPAT_FIXTURE;
+test('different version with matching anchors applies and reverts exactly; incompatible source never writes',{skip:!fixture},()=>{
+ const root=fs.mkdtempSync(path.join(process.env.CHARLIB_TEST_ROOT||path.resolve('work_temp/github-release'),'compat-'));
+ fs.cpSync(fixture,root,{recursive:true});
+ const files=fs.readdirSync(root,{recursive:true}).filter(n=>fs.statSync(path.join(root,n)).isFile());
+ const before=new Map(files.map(n=>[n,fs.readFileSync(path.join(root,n))]));
+ assert.equal(install('check',root),'ready');assert.equal(install('apply',root),'applied');assert.equal(install('revert',root),'reverted');
+ for(const [n,b]of before)assert.deepEqual(fs.readFileSync(path.join(root,n)),b,n);
+ const target=path.join(root,'public/script.js');fs.appendFileSync(target,'\n// edited after backup\n');
+ assert.throws(()=>install('apply',root),/changed since installation/);
+ const fresh=fs.mkdtempSync(path.join(path.dirname(root),'unknown-'));fs.cpSync(fixture,fresh,{recursive:true});
+ fs.writeFileSync(path.join(fresh,'public/script.js'),'export const incompatible = true;');
+ assert.throws(()=>install('apply',fresh),/anchor/);assert(!fs.existsSync(path.join(fresh,'.st-character-library-adapter-1.18.0')));
+ fs.cpSync(fixture,fresh,{recursive:true});fs.writeFileSync(path.join(fresh,'node_modules/png-chunk-text/decode.js'),'unknown dependency');
+ assert.throws(()=>install('apply',fresh),/dependency source/);
+});

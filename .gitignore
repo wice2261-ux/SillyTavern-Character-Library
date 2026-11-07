@@ -1,0 +1,12 @@
+node_modules/
+work_temp/
+.st-character-library-adapter*/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log
+.env
+data/
+config.yaml
+*.pem
+*.key

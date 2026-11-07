@@ -1,0 +1,45 @@
+// Only run against this release's disposable seeded localhost fixture.
+import assert from 'node:assert/strict';
+import {setTimeout as sleep} from 'node:timers/promises';
+import fs from 'node:fs';
+import path from 'node:path';
+import {writeChanged} from '../server/card.mjs';
+if(process.env.ST_LIBRARY_SMOKE!=='isolated')throw Error('Requires isolated instance');
+const origin=new URL(process.argv[2]);if(origin.hostname!=='127.0.0.1')throw Error('Loopback only');
+const csrf=await fetch(new URL('/csrf-token',origin));
+const headers={'Content-Type':'application/json','X-CSRF-Token':(await csrf.json()).token,Cookie:csrf.headers.getSetCookie().map(s=>s.split(';')[0]).join('; '),'X-ST-Library-Client':'modification-http'};
+async function req(route,body={},id){const r=await fetch(new URL('/api/'+route,origin),{method:'POST',headers:{...headers,...(id?{'X-ST-Library-Id':id}:{})},body:JSON.stringify(body)});const text=await r.text();assert(r.ok,route+': '+text);try{return JSON.parse(text)}catch{return text}}
+const api=(route,body={})=>req('plugins/character-library/'+route,{adapter:'1.18.0',client:'modification-http',...body});
+async function list(options={}){let r;for(let n=0;n<200;n++){r=await api('list',{pageSize:100,...options});if(!r.progress.running)return r;await sleep(20)}throw Error('scan not finished')}
+const status=await api('status');assert.deepEqual(status.resources,{onlineLimit:9,budgetMiB:224});
+const initial=await list({search:'Date',dir:'asc',pinnedFirst:false});
+initial.items=initial.items.filter(x=>['DateEarly.png','DateLater.png','DateUnknown.png'].includes(x.avatar));
+assert.deepEqual(initial.items.map(x=>x.avatar),['DateEarly.png','DateLater.png','DateUnknown.png']);
+assert.equal(initial.items[0].imported,Date.parse('2015-01-01T00:00:00Z'));assert.equal(initial.items[2].imported,null);
+const old=initial.items[0];await api('migrate');await api('prepare',{avatars:[old.avatar]});await api('lease',{avatars:[old.avatar]});
+await req('characters/merge-attributes',{avatar:old.avatar,description:'edited'},old.id);
+const full=await req('characters/get',{avatar_url:old.avatar});const card=JSON.parse(full.json_data);card.chat='Foreign-history';card.description=card.data.description='replaced';
+const form=new FormData();form.set('avatar',new Blob([JSON.stringify(card)]),'replacement.json');form.set('file_type','json');form.set('preserved_name',old.avatar);form.set('library_replace_avatar',old.avatar);
+const h={...headers,'X-ST-Library-Id':old.id};delete h['Content-Type'];
+const r=await fetch(new URL('/api/characters/import',origin),{method:'POST',headers:h,body:form});assert.equal(r.status,200);
+assert.equal((await list({search:'DateEarly'})).items.find(x=>x.avatar===old.avatar).imported,old.imported);
+const start=Date.now();const copy=await req('characters/duplicate',{avatar_url:old.avatar},old.id);
+const copied=(await list({search:copy.path})).items[0];assert(copied.imported>=start&&copied.imported<=Date.now());assert.notEqual(copied.id,old.id);
+const renamed=await req('characters/rename',{avatar_url:copy.path,new_name:'DateCopyRenamed'},copied.id);
+assert.equal((await list({search:renamed.avatar})).items[0].imported,copied.imported);
+const suffix=Date.now();
+await req('characters/create',{ch_name:'DateCreated-'+suffix,file_name:'DateCreated-'+suffix,description:'created',first_mes:'Hello',create_date:'1990-01-01T00:00:00Z'});
+assert((await list({search:'DateCreated-'+suffix})).items[0].imported>=start);
+const importForm=new FormData();importForm.set('avatar',new Blob([JSON.stringify({...card,name:'DateNativeImported',data:{...card.data,name:'DateNativeImported'}})]),'new.json');importForm.set('file_type','json');
+const plain={...headers};delete plain['Content-Type'];const imported=await fetch(new URL('/api/characters/import',origin),{method:'POST',headers:plain,body:importForm});assert.equal(imported.status,200);
+assert((await list({search:'DateNativeImported'})).items[0].imported>=start);
+const plugin=await fetch(new URL('/api/plugins/character-library/import?adapter=1.18.0&name=DatePlugin-'+suffix+'.json',origin),{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream'},body:JSON.stringify(card)});assert.equal(plugin.status,200);assert((await plugin.json()).item.imported>=start);
+await api('restore');const final=(await list({search:'DateEarly'})).items.find(x=>x.avatar===old.avatar);assert.equal(final.imported,old.imported);assert.equal(final.id,old.id);
+const account=path.resolve(process.argv[3]);
+const unindexed='Unindexed-'+suffix+'.png',source=path.join(account,'..','unindexed-'+suffix+'.json');
+fs.writeFileSync(source,JSON.stringify({...card,create_date:'2010-01-01T00:00:00Z'}));writeChanged(source,path.join(account,'characters',unindexed),{format:'json'});
+const late=new FormData();late.set('avatar',new Blob([JSON.stringify({...card,create_date:'2030-01-01T00:00:00Z'})]),'late.json');late.set('file_type','json');late.set('preserved_name',unindexed);late.set('library_replace_avatar',unindexed);
+const lateResponse=await fetch(new URL('/api/characters/import',origin),{method:'POST',headers:plain,body:late});assert.equal(lateResponse.status,200);
+assert.equal((await req('characters/get',{avatar_url:unindexed})).create_date,'2010-01-01T00:00:00Z');
+assert.equal((await list({search:unindexed})).items[0].imported,Date.parse('2010-01-01T00:00:00Z'));
+console.log(JSON.stringify({resources:status.resources,historyOrder:initial.items.map(x=>({avatar:x.avatar,imported:x.imported})),originalTimeUnchanged:true,copyTime:copied.imported,nativeCreateImportAndLibraryImport:true,renameAndRestorePreserveTime:true,unindexedReplacementPreservesOriginalDate:true},null,2));

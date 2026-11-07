@@ -1,0 +1,10 @@
+{
+    "display_name": "角色库",
+    "loading_order": 10,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Character Library contributors",
+    "version": "1.1.1"
+}
