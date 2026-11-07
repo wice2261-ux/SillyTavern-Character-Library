@@ -2,6 +2,10 @@
 
 插件版本 **1.1.1**。将闲置角色卡归库，浏览轻量索引，打开单聊或群聊时按需载入。支持添加、删除、收藏、搜索和排序，聊天、变量、世界书与助手脚本继续由酒馆使用。
 
+仓库地址：<https://github.com/wice2261-ux/SillyTavern-Character-Library>
+
+相关文档：[验证记录](./验证记录.md)（本轮测试范围、已覆盖与未覆盖项）、[发行说明](./RELEASE_NOTES.md)、[第三方许可](./THIRD_PARTY_NOTICES.md)、[MIT LICENSE](./LICENSE)。
+
 ## 版本与兼容性
 
 受测基线是 **SillyTavern 1.18.0、Node.js 24.15.0、酒馆助手 4.12.0**。插件版本不是 1.18.0；发布标题应写为“角色库 v1.1.1（受测 SillyTavern 1.18.0）”。内部适配协议中的历史标识也不是插件版本。
@@ -28,6 +32,16 @@
 
 仓库根目录提供 `manifest.json`，入口为 `extension/index.js` 和 `extension/style.css`。酒馆 Install Extension 会克隆**整个仓库**，不是只下载 `extension/`。这仅完成前端安装，仍须由服务器操作者安装服务端和运行适配安装器；只装前端不能完成归库功能。
 
+填法：酒馆「扩展（Extensions）」→「安装扩展（Install Extension）」，URL 填
+
+```
+https://github.com/wice2261-ux/SillyTavern-Character-Library
+```
+
+确认后刷新页面。等价的手工方式是在服务器执行 `git clone https://github.com/wice2261-ux/SillyTavern-Character-Library`，放到 `public/scripts/extensions/third-party/` 下，目录名保持 `SillyTavern-Character-Library`。
+
+安装后在浏览器 `F12` → 网络面板应看到三条 200：`third-party/SillyTavern-Character-Library/extension/index.js`、同目录 `extension/style.css`，以及仓库根 `manifest.json`。`extension/index.js` 首行 `import * as native from '../../../../script.js';` 依赖扩展目录正好位于 `public/scripts/extensions/third-party/<目录名>/extension/` 的深度，手工放置时不要压平这一层。
+
 整仓克隆会把 `server/`、`test/`、`adapter/` 等源码也放到酒馆前端扩展目录，这些文件可能直接通过 HTTP 访问。源码本身公开，但不要在仓库或该目录中存放密钥、用户数据和本地备份。本轮不拆分前端仓库。
 
 ### 升级与回退
@@ -38,7 +52,7 @@
 
 ### Docker
 
-完整包提供 Dockerfile，可构建独立镜像标签，例如 `sillytavern-character-library:1.1.1`。其基础镜像仍使用受测酒馆版本；希望使用其他版本时应自行调整基础镜像并验证。不要覆盖旧镜像标签；宿主机插件挂载会遮住镜像中的插件，须同步更新对应挂载内容。运行配置和端口沿用原 Compose 设置。具体是否实际构建测试见《验证记录》。
+完整包提供 Dockerfile，可构建独立镜像标签，例如 `sillytavern-character-library:1.1.1`。其基础镜像仍使用受测酒馆版本；希望使用其他版本时应自行调整基础镜像并验证。不要覆盖旧镜像标签；宿主机插件挂载会遮住镜像中的插件，须同步更新对应挂载内容。运行配置和端口沿用原 Compose 设置。具体是否实际构建测试见 [验证记录](./验证记录.md)。
 
 ## 使用
 
