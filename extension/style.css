@@ -45,5 +45,6 @@
 #cl-library-settings p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
 #cl-library-settings .cl-settings-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 #cl-library-settings .menu_button { width: auto; margin: 0; white-space: normal; }
+#cl-library-settings button[hidden] { display: none !important; }
 #cl-library-settings button:disabled { opacity: .5; cursor: default; }
 #cl-library-settings :focus-visible, #cl-library-menu:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
